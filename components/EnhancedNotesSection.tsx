@@ -61,24 +61,31 @@ export function EnhancedNotesSection({ isCompact = true, modelContext }: Enhance
     return modelContext || 'General'
   }
 
-  // Load notes from localStorage
+  // Load notes from server
   useEffect(() => {
-    const savedNotes = localStorage.getItem('instalments-notes')
-    if (savedNotes) {
-      try {
-        const parsed = JSON.parse(savedNotes)
-        setNotes(parsed.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) })))
-      } catch (e) {
-        console.error('Error loading notes:', e)
-      }
-    }
+    fetch('/api/notes')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setNotes(data.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) })))
+        }
+      })
+      .catch(e => console.error('Error loading notes:', e))
   }, [])
 
-  // Save notes to localStorage
+  // Save notes to server (debounced)
   useEffect(() => {
-    if (notes.length > 0) {
-      localStorage.setItem('instalments-notes', JSON.stringify(notes))
-    }
+    const timeoutId = setTimeout(() => {
+      if (notes.length >= 0) { // Save even empty array to allow deletion
+        fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes })
+        }).catch(e => console.error('Error saving notes:', e))
+      }
+    }, 500) // Debounce to avoid too many API calls
+
+    return () => clearTimeout(timeoutId)
   }, [notes])
 
   const addNote = () => {
